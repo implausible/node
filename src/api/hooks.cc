@@ -104,15 +104,9 @@ struct AsyncCleanupHookInfo final {
 // (but not publicly so for easier ABI/API changes). In particular,
 // std::shared_ptr does not generally maintain a consistent ABI even on a
 // specific platform.
-struct ACHHandle final {
+struct AsyncCleanupHookHandle final {
   std::shared_ptr<AsyncCleanupHookInfo> info;
 };
-// This is implemented as an operator on a struct because otherwise you can't
-// default-initialize AsyncCleanupHookHandle, because in C++ for a
-// std::unique_ptr to be default-initializable the deleter type also needs
-// to be default-initializable; in particular, function types don't satisfy
-// this.
-void DeleteACHHandle::operator ()(ACHHandle* handle) const { delete handle; }
 
 void AddEnvironmentCleanupHook(Isolate* isolate,
                                CleanupHook fun,
@@ -145,7 +139,7 @@ static void RunAsyncCleanupHook(void* arg) {
   info->fun(info->arg, FinishAsyncCleanupHook, info);
 }
 
-AsyncCleanupHookHandle AddEnvironmentCleanupHook(
+AsyncCleanupHookHandle* AddEnvironmentCleanupHook(
     Isolate* isolate,
     AsyncCleanupHook fun,
     void* arg) {
@@ -157,14 +151,15 @@ AsyncCleanupHookHandle AddEnvironmentCleanupHook(
   info->arg = arg;
   info->self = info;
   env->AddCleanupHook(RunAsyncCleanupHook, info.get());
-  return AsyncCleanupHookHandle(new ACHHandle { info });
+  return new AsyncCleanupHookHandle { info };
 }
 
 void RemoveEnvironmentCleanupHook(
-    AsyncCleanupHookHandle handle) {
+    AsyncCleanupHookHandle* handle) {
   if (handle->info->started) return;
   handle->info->self.reset();
   handle->info->env->RemoveCleanupHook(RunAsyncCleanupHook, handle->info.get());
+  delete handle;
 }
 
 async_id AsyncHooksGetExecutionAsyncId(Isolate* isolate) {

@@ -635,7 +635,7 @@ struct napi_async_cleanup_hook_handle__ {
   }
 
   ~napi_async_cleanup_hook_handle__() {
-    node::RemoveEnvironmentCleanupHook(std::move(handle_));
+    node::RemoveEnvironmentCleanupHook(handle_);
     if (done_cb_ != nullptr)
       done_cb_(done_data_);
 
@@ -652,7 +652,7 @@ struct napi_async_cleanup_hook_handle__ {
     handle->user_hook_(handle, handle->user_data_);
   }
 
-  node::AsyncCleanupHookHandle handle_;
+  node::AsyncCleanupHookHandle* handle_;
   napi_env env_ = nullptr;
   napi_async_cleanup_hook user_hook_ = nullptr;
   void* user_data_ = nullptr;

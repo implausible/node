@@ -9,9 +9,15 @@ void MustNotCall(void* arg, void(*cb)(void*), void* cbarg) {
 struct AsyncData {
   uv_async_t async;
   v8::Isolate* isolate;
-  node::AsyncCleanupHookHandle handle;
+  node::AsyncCleanupHookHandle* handle;
   void (*done_cb)(void*);
   void* done_arg;
+
+  ~AsyncData() {
+    // It is necessary to free the handle when we've finished using it
+    node::RemoveEnvironmentCleanupHook(handle);
+    handle = nullptr;
+  }
 };
 
 void AsyncCleanupHook(void* arg, void(*cb)(void*), void* cbarg) {
@@ -20,9 +26,6 @@ void AsyncCleanupHook(void* arg, void(*cb)(void*), void* cbarg) {
   assert(loop != nullptr);
   int err = uv_async_init(loop, &data->async, [](uv_async_t* async) {
     AsyncData* data = static_cast<AsyncData*>(async->data);
-    // Attempting to remove the cleanup hook here should be a no-op since it
-    // has already been started.
-    node::RemoveEnvironmentCleanupHook(std::move(data->handle));
 
     uv_close(reinterpret_cast<uv_handle_t*>(async), [](uv_handle_t* handle) {
       AsyncData* data = static_cast<AsyncData*>(handle->data);
@@ -53,7 +56,7 @@ void Initialize(v8::Local<v8::Object> exports,
       context->GetIsolate(),
       MustNotCall,
       nullptr);
-  node::RemoveEnvironmentCleanupHook(std::move(must_not_call_handle));
+  node::RemoveEnvironmentCleanupHook(must_not_call_handle);
 }
 
 NODE_MODULE_CONTEXT_AWARE(NODE_GYP_MODULE_NAME, Initialize)

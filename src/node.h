@@ -920,17 +920,18 @@ NODE_EXTERN void RemoveEnvironmentCleanupHook(v8::Isolate* isolate,
 
 /* These are async equivalents of the above. After the cleanup hook is invoked,
  * `cb(cbarg)` *must* be called, and attempting to remove the cleanup hook will
- * have no effect. */
-struct ACHHandle;
-struct NODE_EXTERN DeleteACHHandle { void operator()(ACHHandle*) const; };
-typedef std::unique_ptr<ACHHandle, DeleteACHHandle> AsyncCleanupHookHandle;
+ * have no effect. When the module is done with cleanup, RemoveEnvironmentCleanupHook
+ * must be called to free the handle. */
+struct AsyncCleanupHookHandle;
 
-NODE_EXTERN AsyncCleanupHookHandle AddEnvironmentCleanupHook(
+NODE_EXTERN AsyncCleanupHookHandle* AddEnvironmentCleanupHook(
     v8::Isolate* isolate,
     void (*fun)(void* arg, void (*cb)(void*), void* cbarg),
     void* arg);
 
-NODE_EXTERN void RemoveEnvironmentCleanupHook(AsyncCleanupHookHandle holder);
+/* Should always be called after adding async cleanup behavior. If it is called
+ * before async cleanup has been triggered, it will unregister the cleanup. */
+NODE_EXTERN void RemoveEnvironmentCleanupHook(AsyncCleanupHookHandle* handle);
 
 /* Returns the id of the current execution context. If the return value is
  * zero then no execution has been set. This will happen if the user handles
